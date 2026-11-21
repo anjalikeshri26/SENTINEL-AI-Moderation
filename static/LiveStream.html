@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SENTINEL – AI live chat moderation</title>
+<style>
+:root{--bg:#14171c;--panel:#1d2229;--line:#2c333c;--txt:#e8ecf1;--mut:#8b96a5;--red:#ef4444;--grn:#22c55e;--acc:#38bdf8}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.45 system-ui,sans-serif}
+header{padding:18px 24px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+h1{margin:0;font-size:22px;letter-spacing:.12em}h1 span{color:var(--acc)}
+.tag{color:var(--mut);font-size:13px}.stats{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 12px;text-align:center;min-width:86px}
+.stat b{display:block;font-size:18px}.stat small{color:var(--mut);font-size:11px}
+main{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:18px;padding:18px 24px;max-width:1400px;margin:auto}
+@media(max-width:920px){main{grid-template-columns:1fr}}
+.stage{position:relative;aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.stage canvas,.stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.live{position:absolute;top:12px;left:12px;background:var(--red);font-weight:700;font-size:12px;padding:3px 9px;border-radius:4px;letter-spacing:.08em}
+.viewers{position:absolute;top:12px;right:12px;background:#0009;padding:3px 9px;border-radius:4px;font-size:12px}
+.caption{position:absolute;left:0;right:0;bottom:22px;text-align:center;font-size:clamp(18px,3vw,34px);font-weight:700;text-shadow:0 2px 12px #000}
+.bar{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+input[type=text]{flex:1;min-width:200px;background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px 12px;font:inherit}
+button{background:var(--acc);color:#04283a;border:0;border-radius:8px;padding:9px 16px;font:inherit;font-weight:600;cursor:pointer}
+button.ghost{background:var(--panel);color:var(--txt);border:1px solid var(--line)}button:disabled{opacity:.5}
+.ctrl{display:flex;gap:18px;align-items:center;margin-top:14px;color:var(--mut);font-size:13px;flex-wrap:wrap}
+.ctrl input[type=range]{vertical-align:middle;accent-color:var(--acc)}
+.chat{background:var(--panel);border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;height:min(78vh,640px)}
+.chat h2{margin:0;padding:12px 14px;font-size:14px;border-bottom:1px solid var(--line)}
+#feed{flex:1;overflow-y:auto;padding:10px 14px}
+.msg{padding:5px 0;word-break:break-word;animation:in .25s}@keyframes in{from{opacity:0;transform:translateY(6px)}}
+.msg .u{font-weight:700;margin-right:6px}.msg.me .u::after{content:" (you)";color:var(--mut);font-weight:400}
+.held{background:#ef444418;border-left:3px solid var(--red);padding:6px 10px;border-radius:0 6px 6px 0;margin:4px 0}
+.held .why{color:#fca5a5;font-size:12px}.held button{padding:1px 8px;font-size:12px;margin-left:8px}
+.held .t{display:none;margin-top:4px;color:var(--mut)}.held.open .t{display:block}
+.score{font-size:11px;color:var(--mut);margin-left:6px}
+form{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
+.tools{display:flex;gap:6px;padding:8px 14px;flex-wrap:wrap;border-bottom:1px solid var(--line)}.tools button{padding:4px 10px;font-size:12px}#pastebox{padding:8px 14px;border-bottom:1px solid var(--line)}#pastebox textarea{width:100%;background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;margin-bottom:6px}#err{color:#fbbf24;font-size:12px;padding:0 14px 8px}
+</style></head><body>
+<header>
+  <h1><span>SENTINEL</span> LIVE</h1><span class="tag">an AI that has your back · real-time chat moderation</span>
+  <div class="stats">
+    <div class="stat"><b id="s-scan">0</b><small>scanned</small></div>
+    <div class="stat"><b id="s-held">0</b><small>held for review</small></div>
+    <div class="stat"><b id="s-lat">–</b><small>avg latency</small></div>
+    <div class="stat"><b id="s-acc">–</b><small>model accuracy</small></div>
+  </div>
+</header>
+<main>
+  <section>
+    <div class="stage" id="stage">
+      <canvas id="cv" hidden></canvas><iframe id="yt" src="https://www.youtube.com/embed/oZzQC8NVTeM" allowfullscreen allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"></iframe>
+      <span class="live" id="live" hidden>● LIVE</span><span class="viewers" id="viewers" hidden>👁 1,204</span>
+      <div class="caption" id="cap" hidden>Welcome to the stream</div>
+    </div>
+    <div class="bar">
+      <input type="text" id="yturl" placeholder="Paste any YouTube link to moderate that video's comments">
+      <button class="ghost" id="ytgo">Load video</button><button class="ghost" id="ytoff" hidden>Simulated stream</button>
+    </div>
+    <div class="ctrl">
+      <label><input type="checkbox" id="sim"> Add simulated viewers</label>
+      <label>Strictness <input type="range" id="thr" min="20" max="95" value="50"> <span id="thrv">50%</span></label>
+      <span>Higher strictness = fewer messages held.</span>
+    </div>
+  </section>
+  <aside class="chat">
+    <h2>Comments</h2>
+    <div class="tools"><button class="ghost" id="loadc">Load video comments</button><button class="ghost" id="more" hidden>Load more</button><button class="ghost" id="pastebtn">Paste comments</button></div>
+    <div id="pastebox" hidden><textarea id="pasta" rows="4" placeholder="One comment per line"></textarea><button id="pgo">Moderate these</button></div><div id="feed" aria-live="polite"></div><div id="err"></div>
+    <form id="f"><input type="text" id="box" maxlength="500" placeholder="Say something..." autocomplete="off"><button id="send">Send</button></form>
+  </aside>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const CLEAN=["great stream!","love this song","that was sick","chat is on fire 🔥","gg well played","hello from Kolkata!","can you explain that part again?","audio is a bit quiet","first time here, subscribed","this slaps","baddie","lets goooo","bro cooked","absolute legend","thanks for the tutorial","what camera are you using?","i learned a lot today","that boss fight was brutal","kill the boss!","love from India","the editing is fantastic","bad internet today, stream is laggy","i disagree but fair point","who else is watching in 2026?","mod please pin the schedule","you are killing it"];
+const TOXIC=["you are a worthless idiot","shut up you stupid clown","nobody likes you, loser","this streamer is trash, go die","what a pathetic moron","ban this scumbag","you are such a b1tch","get lost you piece of garbage","kill yourself loser","u r an absolute dumbass"];
+const NAMES=["Aarav","Mira","NightOwl","pixel_pete","Zoya","DevK","LunaFox","Rohan","gamer_girl","Kabir","StreamFan","Ishaan","Tara","BlueJay","Neel"];
+const COLORS=["#38bdf8","#a78bfa","#34d399","#fbbf24","#f472b6","#fb923c"];
+const st={scan:0,held:0,lat:[]};let thr=.5,timer;
+
+function stats(){$("s-scan").textContent=st.scan;$("s-held").textContent=st.held;
+  $("s-lat").textContent=st.lat.length?Math.round(st.lat.reduce((a,b)=>a+b)/st.lat.length)+" ms":"–";}
+async function score(text){
+  const t0=performance.now();
+  const r=await fetch("/predict",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});
+  if(!r.ok) throw new Error((await r.json()).error||r.statusText);
+  st.lat.push(performance.now()-t0); if(st.lat.length>50)st.lat.shift();
+  return (await r.json()).toxicity;
+}
+function add(user,text,tox,mine){
+  const feed=$("feed"),near=feed.scrollHeight-feed.scrollTop-feed.clientHeight<80;
+  const d=document.createElement("div");d.className="msg"+(mine?" me":"");
+  const u=document.createElement("span");u.className="u";u.textContent=user;
+  u.style.color=COLORS[[...user].reduce((a,c)=>a+c.charCodeAt(0),0)%COLORS.length];
+  st.scan++;
+  if(tox>=thr){
+    st.held++;d.className+=" held";
+    const why=document.createElement("div");why.className="why";
+    why.textContent="⚠ Message from "+user+" held for review · toxicity "+Math.round(tox*100)+"%";
+    const b=document.createElement("button");b.className="ghost";b.textContent="show";
+    const t=document.createElement("div");t.className="t";t.textContent=text;     // textContent: no HTML injection
+    b.onclick=()=>{d.classList.toggle("open");b.textContent=d.classList.contains("open")?"hide":"show"};
+    why.append(b);d.append(why,t);
+  }else{
+    const t=document.createElement("span");t.textContent=text;
+    const s=document.createElement("span");s.className="score";s.textContent=Math.round(tox*100)+"%";
+    d.append(u,t,s);
+  }
+  feed.append(d);while(feed.children.length>150)feed.firstChild.remove();
+  if(near||mine)feed.scrollTop=feed.scrollHeight;stats();
+}
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+function tick(){
+  clearTimeout(timer);if(!$("sim").checked)return;
+  const text=Math.random()<.22?pick(TOXIC):pick(CLEAN),user=pick(NAMES);
+  score(text).then(t=>{$("err").textContent="";add(user,text,t,false)}).catch(e=>$("err").textContent="Moderation service unavailable: "+e.message)
+    .finally(()=>timer=setTimeout(tick,900+Math.random()*1400));
+}
+$("sim").onchange=tick;
+$("thr").oninput=e=>{thr=e.target.value/100;$("thrv").textContent=e.target.value+"%"};
+$("f").onsubmit=async e=>{
+  e.preventDefault();const text=$("box").value.trim();if(!text)return;
+  $("send").disabled=true;
+  try{const t=await score(text);add("You",text,t,true);$("box").value="";$("err").textContent=""}
+  catch(x){$("err").textContent="Moderation service unavailable: "+x.message}
+  finally{$("send").disabled=false;$("box").focus()}
+};
+fetch("/model-info").then(r=>r.json()).then(m=>{if(m.accuracy)$("s-acc").textContent=(m.accuracy*100).toFixed(1)+"%"}).catch(()=>{});
+
+/* viewers + captions */
+let v=1204;setInterval(()=>{v+=Math.round((Math.random()-.45)*18);$("viewers").textContent="👁 "+v.toLocaleString()},2000);
+const caps=["Welcome to the stream","An AI that has your back","SENTINEL is watching the chat","Be kind in chat 💙"];let ci=0;
+setInterval(()=>{$("cap").textContent=caps[++ci%caps.length]},4000);
+
+/* animated stage (no external video needed) */
+const cv=$("cv"),cx=cv.getContext("2d");let T=0;
+function draw(){
+  const w=cv.width=cv.clientWidth,h=cv.height=cv.clientHeight;T+=.012;
+  const g=cx.createLinearGradient(0,0,w,h);g.addColorStop(0,"#0f172a");g.addColorStop(1,"#1e1b4b");cx.fillStyle=g;cx.fillRect(0,0,w,h);
+  for(let k=0;k<5;k++){cx.beginPath();cx.moveTo(0,h);
+    for(let x=0;x<=w;x+=8)cx.lineTo(x,h*(.55+k*.07)+Math.sin(x/(70+k*25)+T*(1+k*.3))*h*.05);
+    cx.lineTo(w,h);cx.closePath();cx.fillStyle=`hsla(${200+k*25},80%,55%,${.12+k*.03})`;cx.fill();}
+  requestAnimationFrame(draw);
+}draw();
+
+/* real video + real comments */
+let vid="oZzQC8NVTeM",nextTok=null;
+function mode(video){["yt"].forEach(i=>$(i).hidden=!video);["cv","live","viewers","cap"].forEach(i=>$(i).hidden=video);$("ytoff").hidden=!video}
+async function loadComments(more){
+  const q=new URLSearchParams({video:vid});if(more&&nextTok)q.set("page",nextTok);
+  $("loadc").disabled=true;$("err").textContent="Loading comments...";
+  try{
+    const r=await fetch("/api/youtube-comments?"+q),j=await r.json();
+    if(!r.ok)throw new Error(j.error||r.statusText);
+    if(!more){$("feed").replaceChildren();st.scan=st.held=0}
+    j.comments.forEach(c=>add(c.author,c.text,c.toxicity,false));
+    nextTok=j.nextPageToken||null;$("more").hidden=!nextTok;
+    $("err").textContent=j.comments.length?"":"No comments found on this video.";$("feed").scrollTop=0;
+  }catch(e){$("err").textContent=e.message}finally{$("loadc").disabled=false}
+}
+$("loadc").onclick=()=>loadComments(false);$("more").onclick=()=>loadComments(true);
+$("pastebtn").onclick=()=>$("pastebox").hidden=!$("pastebox").hidden;
+$("pgo").onclick=async()=>{
+  const texts=$("pasta").value.split("\n").map(s=>s.trim()).filter(Boolean);if(!texts.length)return;
+  try{
+    const r=await fetch("/predict_batch",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({texts})}),j=await r.json();
+    if(!r.ok)throw new Error(j.error);
+    $("feed").replaceChildren();st.scan=st.held=0;texts.forEach((t,i)=>add("Viewer "+(i+1),t,j.toxicity[i],false));
+    $("pasta").value="";$("pastebox").hidden=true;$("err").textContent="";
+  }catch(e){$("err").textContent=e.message}
+};
+$("ytgo").onclick=()=>{
+  const m=$("yturl").value.match(/(?:v=|youtu\.be\/|embed\/|live\/)([\w-]{11})/);
+  if(!m){$("err").textContent="That doesn't look like a YouTube link.";return}
+  vid=m[1];$("yt").src="https://www.youtube.com/embed/"+vid;mode(true);loadComments(false);
+};
+$("ytoff").onclick=()=>{$("yt").src="";mode(false);$("sim").checked=true;$("feed").replaceChildren();tick()};
+mode(true);loadComments(false);
+</script></body></html>

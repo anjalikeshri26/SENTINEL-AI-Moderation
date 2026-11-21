@@ -1,0 +1,22 @@
+{
+  "dataset": "Davidson et al. 2017 + chat augmentation",
+  "train_size": 20410,
+  "test_size": 4957,
+  "best_C": 10.0,
+  "accuracy": 0.9566,
+  "toxic_precision": 0.9858,
+  "toxic_recall": 0.9617,
+  "toxic_f1": 0.9736,
+  "clean_f1": 0.8783,
+  "roc_auc": 0.9859,
+  "confusion_matrix [[TN,FP],[FN,TP]]": [
+    [
+      776,
+      57
+    ],
+    [
+      158,
+      3966
+    ]
+  ]
+}
